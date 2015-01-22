@@ -1,4 +1,6 @@
 class User < ActiveRecord::Base
+  has_many :microposts, dependent: :destroy
+
   attr_accessor :remember_token, :activation_token, :reset_token
   # before_save { self.email = email.downcase }
   before_save   :downcase_email
@@ -27,9 +29,7 @@ VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
     UserMailer.account_activation(self).deliver_now
   end
 
-  def downcase_email
-    self.email = email.downcase
-  end
+
 
   def create_reset_digest
     self.reset_token = User.new_token
@@ -40,10 +40,7 @@ VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
   def send_password_reset_email
     UserMailer.password_reset(self).deliver_now
   end
-  def create_activation_digest
-    self.activation_token  = User.new_token
-    self.activation_digest = User.digest(activation_token)
-  end
+
   def User.new_token
     SecureRandom.urlsafe_base64
   end
@@ -61,5 +58,20 @@ VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
 
   def forget
     update_attribute(:remember_digest, nil)
+  end
+
+  def feed
+    Micropost.where("user_id = ?", id)
+  end
+
+  private
+
+  def downcase_email
+    self.email = email.downcase
+  end
+
+  def create_activation_digest
+    self.activation_token  = User.new_token
+    self.activation_digest = User.digest(activation_token)
   end
 end
