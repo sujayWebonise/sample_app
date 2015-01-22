@@ -1,5 +1,14 @@
 class User < ActiveRecord::Base
   has_many :microposts, dependent: :destroy
+  has_many :active_relationships, class_name:  "Relationship",
+                                foreign_key: "follower_id",
+                                dependent:   :destroy
+has_many :passive_relationships, class_name:  "Relationship",
+                                   foreign_key: "followed_id",
+                                   dependent:   :destroy
+has_many :following, through: :active_relationships, source: :followed
+has_many :followers, through: :passive_relationships, source: :follower
+
 
   attr_accessor :remember_token, :activation_token, :reset_token
   # before_save { self.email = email.downcase }
@@ -28,8 +37,6 @@ VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
   def send_activation_email
     UserMailer.account_activation(self).deliver_now
   end
-
-
 
   def create_reset_digest
     self.reset_token = User.new_token
@@ -60,8 +67,27 @@ VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
     update_attribute(:remember_digest, nil)
   end
 
+  def password_reset_expired?
+    reset_sent_at < 2.hours.ago
+  end
+
   def feed
-    Micropost.where("user_id = ?", id)
+    following_ids = "SELECT followed_id FROM relationships
+                     WHERE  follower_id = :user_id"
+    Micropost.where("user_id IN (#{following_ids})
+                     OR user_id = :user_id", user_id: id)
+  end
+
+  def follow(other_user)
+    active_relationships.create(followed_id: other_user.id)
+  end
+
+  def unfollow(other_user)
+    active_relationships.find_by(followed_id: other_user.id).destroy
+  end
+
+  def following?(other_user)
+    following.include?(other_user)
   end
 
   private
